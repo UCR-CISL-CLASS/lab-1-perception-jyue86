@@ -1,4 +1,8 @@
+.vscode
+kitti-dataset/
+labels_with_dont_care/
 *.pth
+*.pt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
