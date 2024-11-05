@@ -141,6 +141,20 @@ class World(object):
         self.world.on_tick(hud.on_world_tick)
         self.recording_enabled = False
         self.recording_start = 0
+        self.get_camera_dims()
+
+    def get_camera_dims(self):
+        bp_library = self.world.get_blueprint_library()
+        camera_bp = bp_library.find('sensor.camera.rgb')
+        image_w = camera_bp.get_attribute("image_size_x").as_int()
+        image_h = camera_bp.get_attribute("image_size_y").as_int()
+        fov = camera_bp.get_attribute("fov").as_float()
+
+        return {
+            "image_w": image_w,
+            "image_h": image_h,
+            "fov": fov
+        }
 
     def restart(self, args):
         """Restart the world"""
@@ -931,6 +945,26 @@ def game_loop(args):
 
         clock = pygame.time.Clock()
 
+        # new code
+        def build_projection_matrix(w, h, fov, is_behind_camera=False):
+            focal = w / (2.0 * np.tan(fov * np.pi / 360.0))
+            K = np.identity(3)
+
+            if is_behind_camera:
+                K[0, 0] = K[1, 1] = -focal
+            else:
+                K[0, 0] = K[1, 1] = focal
+
+            K[0, 2] = w / 2.0
+            K[1, 2] = h / 2.0
+            return K
+
+        cam_K = build_projection_matrix(
+            1280,
+            720,
+            100
+        )
+
         while True:
             clock.tick()
             if args.sync:
@@ -956,7 +990,9 @@ def game_loop(args):
                     print("The target has been reached, stopping the simulation")
                     break
 
-            control = agent.run_step()
+            sensor_transforms = agent.get_sensor_transforms()
+            sensor_transforms["camera_K"] = cam_K 
+            control = agent.run_step(sensor_transforms)
             if control is not None:
                 control.manual_gear_shift = False
                 world.player.apply_control(control)

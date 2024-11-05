@@ -75,8 +75,18 @@ def compute_iou(box, boxes):
     # Calculate intersection areas
     # if np.any(np.array([box.union(b).area for b in boxes])==0):
     #     print('debug')
-    iou = [box.intersection(b).area / box.union(b).area for b in boxes]
-
+    # iou = [box.intersection(b).area / box.union(b).area for b in boxes]
+    iou = []
+    for b in boxes:
+        print("------")
+        print("box")
+        print(box)
+        print("------")
+        print("------")
+        print("gt box")
+        print(b)
+        print("------")
+        iou.append(box.intersection(b).area / box.union(b).area)
     return np.array(iou, dtype=np.float32)
 
 def caluclate_tp_fp(det_boxes, det_score, gt_boxes, result_stat, iou_thresh):

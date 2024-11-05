@@ -84,7 +84,6 @@ class BehaviorAgent(BasicAgent):
     def destroy(self):
         eval_final_results(self.result_stat, global_sort_detections=True)
         
-
     def sensors(self):  # pylint: disable=no-self-use
         sensors = self._detector.sensors()
         for s in sensors:
@@ -349,8 +348,18 @@ class BehaviorAgent(BasicAgent):
         detection_results["det_score"] = np.array(detection_results["det_score"])
         return detection_results
 
+    def get_sensor_transforms(self):
+        left_cam_2_world = np.array(self.sensor_interface._sensors_objects['Left'].get_transform().get_matrix())
+        right_cam_2_world = np.array(self.sensor_interface._sensors_objects['Right'].get_transform().get_matrix())
+        lidar_2_world = np.array(self.sensor_interface._sensors_objects['LIDAR'].get_transform().get_matrix())
 
-    def run_step(self, debug=False):
+        return {
+            "left2world": left_cam_2_world,
+            "right2world": right_cam_2_world,
+            "lidar2world": lidar_2_world
+        }
+
+    def run_step(self, sensor_transforms, debug=False):
         """
         Execute one step of navigation.
 
@@ -358,7 +367,7 @@ class BehaviorAgent(BasicAgent):
             :return control: carla.VehicleControl
         """
         sensor_data = self.get_sensor_data()
-        detections = self._detector.detect(sensor_data)
+        detections = self._detector.detect(sensor_data, sensor_transforms)
         gt_detections = self.gt_actors()
 
         # Evaluate detection results
