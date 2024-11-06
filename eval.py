@@ -75,18 +75,7 @@ def compute_iou(box, boxes):
     # Calculate intersection areas
     # if np.any(np.array([box.union(b).area for b in boxes])==0):
     #     print('debug')
-    # iou = [box.intersection(b).area / box.union(b).area for b in boxes]
-    iou = []
-    for b in boxes:
-        print("------")
-        print("box")
-        print(box)
-        print("------")
-        print("------")
-        print("gt box")
-        print(b)
-        print("------")
-        iou.append(box.intersection(b).area / box.union(b).area)
+    iou = [box.intersection(b).area / box.union(b).area for b in boxes]
     return np.array(iou, dtype=np.float32)
 
 def caluclate_tp_fp(det_boxes, det_score, gt_boxes, result_stat, iou_thresh):
@@ -118,10 +107,13 @@ def caluclate_tp_fp(det_boxes, det_score, gt_boxes, result_stat, iou_thresh):
         det_polygon_list = list(convert_format(det_boxes))
         gt_polygon_list = list(convert_format(gt_boxes))
 
+        max_ious = []
         # match prediction and gt bounding box
         for i in range(score_order_descend.shape[0]):
             det_polygon = det_polygon_list[score_order_descend[i].item()]
             ious = compute_iou(det_polygon, gt_polygon_list)
+            # print(ious.shape)
+            # max_ious.append(np.max(ious))
 
             if len(gt_polygon_list) == 0 or np.max(ious) < iou_thresh:
                 fp.append(1)
@@ -139,6 +131,8 @@ def caluclate_tp_fp(det_boxes, det_score, gt_boxes, result_stat, iou_thresh):
     result_stat[iou_thresh]['fp'] += fp
     result_stat[iou_thresh]['tp'] += tp
     result_stat[iou_thresh]['gt'] += gt
+
+    return max_ious
 
 
 def calculate_ap(result_stat, iou, global_sort_detections):
@@ -208,25 +202,32 @@ def calculate_ap(result_stat, iou, global_sort_detections):
 def eval_final_results(result_stat, global_sort_detections):
     dump_dict = {}
 
+    ap_05, mrec_05, mpre_05 = calculate_ap(result_stat, 0.05, global_sort_detections)
     ap_30, mrec_30, mpre_30 = calculate_ap(result_stat, 0.30, global_sort_detections)
     ap_50, mrec_50, mpre_50 = calculate_ap(result_stat, 0.50, global_sort_detections)
     ap_70, mrec_70, mpre_70 = calculate_ap(result_stat, 0.70, global_sort_detections)
 
-    dump_dict.update({'ap_30': ap_30,
+    dump_dict.update({
+                      "ap_05": ap_05,
+                      'ap_30': ap_30,
                       'ap_50': ap_50,
                       'ap_70': ap_70,
+                      "mpre_05": mpre_05,
                       'mpre_30': mpre_30,
                       'mpre_50': mpre_50,
                       'mpre_70': mpre_70,
+                      "mrec_05": mrec_05,
                       'mrec_30': mrec_30,
                       'mrec_50': mrec_50,
                       'mrec_70': mrec_70,
                       })
 
     print("\nTotal object instances: %d" % result_stat[0.3]['gt'])
+    print(ap_05, ap_30, ap_50, ap_70)
 
     print('\n=========================================\n'
+          "The Average Precision at IOU 0.05 is %.2f, \n"
           'The Average Precision at IOU 0.3 is %.2f, \n'
           'The Average Precision at IOU 0.5 is %.2f, \n'
           'The Average Precision at IOU 0.7 is %.2f. \n'
-          '=========================================\n' % (ap_30, ap_50, ap_70))
+          '=========================================\n' % (ap_05, ap_30, ap_50, ap_70))

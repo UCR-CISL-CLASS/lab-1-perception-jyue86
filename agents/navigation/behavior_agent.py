@@ -45,6 +45,7 @@ class BehaviorAgent(BasicAgent):
 
         super().__init__(vehicle, opt_dict=opt_dict, map_inst=map_inst, grp_inst=grp_inst)
         self._look_ahead_steps = 0
+        # self._count = 0
 
         # Vehicle information
         self._speed = 0
@@ -74,7 +75,9 @@ class BehaviorAgent(BasicAgent):
         self._detector = Detector()
 
         # Evaluate detection results
-        self.result_stat = {0.3: {'tp': [], 'fp': [], 'gt': 0, 'score': []},                
+        self.result_stat = {
+                            0.05: {'tp': [], 'fp': [], 'gt': 0, 'score': []},
+                            0.3: {'tp': [], 'fp': [], 'gt': 0, 'score': []},                
                             0.5: {'tp': [], 'fp': [], 'gt': 0, 'score': []},                
                             0.7: {'tp': [], 'fp': [], 'gt': 0, 'score': []}}\
         
@@ -351,12 +354,17 @@ class BehaviorAgent(BasicAgent):
     def get_sensor_transforms(self):
         left_cam_2_world = np.array(self.sensor_interface._sensors_objects['Left'].get_transform().get_matrix())
         right_cam_2_world = np.array(self.sensor_interface._sensors_objects['Right'].get_transform().get_matrix())
-        lidar_2_world = np.array(self.sensor_interface._sensors_objects['LIDAR'].get_transform().get_matrix())
+        forward_cam_2_world = np.array(self.sensor_interface._sensors_objects['Forward'].get_transform().get_matrix())
 
         return {
             "left2world": left_cam_2_world,
             "right2world": right_cam_2_world,
-            "lidar2world": lidar_2_world
+            "forward2world": forward_cam_2_world,
+            "LIDAR2world": np.array(self.sensor_interface._sensors_objects['LIDAR'].get_transform().get_matrix()),
+            "Side-Left-LIDAR2world": np.array(self.sensor_interface._sensors_objects['Side-Left-LIDAR'].get_transform().get_matrix()),
+            "Side-Right-LIDAR2world": np.array(self.sensor_interface._sensors_objects['Side-Right-LIDAR'].get_transform().get_matrix()),
+            "Front-LIDAR2world": np.array(self.sensor_interface._sensors_objects['Front-LIDAR'].get_transform().get_matrix()),
+            "Back-LIDAR2world": np.array(self.sensor_interface._sensors_objects['Back-LIDAR'].get_transform().get_matrix()),
         }
 
     def run_step(self, sensor_transforms, debug=False):
@@ -385,7 +393,67 @@ class BehaviorAgent(BasicAgent):
             'gt_det':gt_detections,
             'det':detections
         }
+
+        if "det_boxes" in detections and gt_detections["det_boxes"].shape[0] > 0:
+            # if self._count == 0 and gt_detections["det_boxes"].shape[0] > 0:
+            print("====================================")
+            # print("Frame number:", frame_number)
+            # print("GT detections:\n", gt_detections["det_boxes"])
+            # print("Detections:\n", det_boxes)
+            # print("gt box shape:", gt_detections["det_boxes"].shape)
+            # print("det box shape:", det_boxes.shape)
+            max_iou = float("-inf") 
+
+            for gt_box in gt_detections["det_boxes"]:
+                for det_box in det_boxes:
+                    # Compute the intersection
+                    ixmin = np.maximum(gt_box[:, 0].min(), det_box[:, 0].min())
+                    iymin = np.maximum(gt_box[:, 1].min(), det_box[:, 1].min())
+                    izmin = np.maximum(gt_box[:, 2].min(), det_box[:, 2].min())
+                    ixmax = np.minimum(gt_box[:, 0].max(), det_box[:, 0].max())
+                    iymax = np.minimum(gt_box[:, 1].max(), det_box[:, 1].max())
+                    izmax = np.minimum(gt_box[:, 2].max(), det_box[:, 2].max())
+
+                    iw = np.maximum(ixmax - ixmin, 0)
+                    ih = np.maximum(iymax - iymin, 0)
+                    id = np.maximum(izmax - izmin, 0)
+
+                    intersection = iw * ih * id
+
+                    # Compute the volume of each box
+                    gt_volume = (gt_box[:, 0].max() - gt_box[:, 0].min()) * \
+                                (gt_box[:, 1].max() - gt_box[:, 1].min()) * \
+                                (gt_box[:, 2].max() - gt_box[:, 2].min())
+
+                    det_volume = (det_box[:, 0].max() - det_box[:, 0].min()) * \
+                                 (det_box[:, 1].max() - det_box[:, 1].min()) * \
+                                 (det_box[:, 2].max() - det_box[:, 2].min())
+
+                    union = gt_volume + det_volume - intersection
+
+                    if union == 0:
+                        continue
+
+                    try:
+                        iou = intersection / union
+                        if iou != 0.0:
+                            print("Frame number:", frame_number)
+                            print("GT detections:\n", gt_box)
+                            print("Detections:\n", det_box)
+
+                        max_iou = max(iou, max_iou)
+                        # print(f"IoU between GT box and detection box: {iou}")
+                    except Exception as e:
+                        print(f"Error computing IoU: {e}")
+            print("max IoU:", max_iou)
+            print("====================================")
+            # np.save("lidar_data.npy", sensor_data["LIDAR"][1])
+            # np.save("lidar2world.npy", sensor_transforms["lidar2world"])
+            # np.save("gt_det.npy", gt_detections["det_boxes"])
+            # np.save("det.npy", det_boxes)
+        # self._count += 1
             
+        caluclate_tp_fp(det_boxes, det_score, gt_detections["det_boxes"], self.result_stat, iou_thresh=0.05)
         caluclate_tp_fp(det_boxes, det_score, gt_detections["det_boxes"], self.result_stat, iou_thresh=0.3)
         caluclate_tp_fp(det_boxes, det_score, gt_detections["det_boxes"], self.result_stat, iou_thresh=0.5)
         caluclate_tp_fp(det_boxes, det_score, gt_detections["det_boxes"], self.result_stat, iou_thresh=0.7)

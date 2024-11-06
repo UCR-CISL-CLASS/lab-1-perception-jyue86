@@ -962,7 +962,8 @@ def game_loop(args):
         cam_K = build_projection_matrix(
             1280,
             720,
-            100
+            100,
+            is_behind_camera=False
         )
 
         while True:
