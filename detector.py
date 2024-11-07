@@ -47,37 +47,38 @@ class Detector:
 
         """
         sensors = [
+            # lidar sensors
             {'type': 'sensor.lidar.ray_cast', 'x': 0.7, 'y': 0.0, 'z': 1.60, 'yaw': 0.0, 'pitch': 0.0, 'roll': 0.0,
                       'range': 50, 
-                      'rotation_frequency': 20, 'channels': 128,
+                      'rotation_frequency': 20, 'channels': 64,
                       'upper_fov': 4, 'lower_fov': -20, 'points_per_second': 2304000,
                       'id': 'LIDAR'},
 
             {'type': 'sensor.lidar.ray_cast', 'x': 0.0, 'y': -0.4, 'z': 1.60, 'yaw': 0.0, 'pitch': 0.0, 'roll': 0.0,
                       'range': 20, 
-                      'rotation_frequency': 20, 'channels': 128,
+                      'rotation_frequency': 20, 'channels': 64,
                       'upper_fov': 4, 'lower_fov': -40, 'points_per_second': 2304000,
                       'id': 'Side-Left-LIDAR'},
 
             {'type': 'sensor.lidar.ray_cast', 'x': 0.0, 'y': 0.4, 'z': 1.60, 'yaw': 0.0, 'pitch': 0.0, 'roll': 0.0,
                       'range': 20, 
-                      'rotation_frequency': 20, 'channels': 128,
+                      'rotation_frequency': 20, 'channels': 64,
                       'upper_fov': 4, 'lower_fov': -40, 'points_per_second': 2304000,
                       'id': 'Side-Right-LIDAR'},
 
             {'type': 'sensor.lidar.ray_cast', 'x': 0.9, 'y': 0.0, 'z': 1.60, 'yaw': 0.0, 'pitch': 0.0, 'roll': 0.0,
                       'range': 30, 
-                      'rotation_frequency': 20, 'channels': 128,
+                      'rotation_frequency': 20, 'channels': 64,
                       'upper_fov': 4, 'lower_fov': -25, 'points_per_second': 2304000,
                       'id': 'Front-LIDAR'},
 
             {'type': 'sensor.lidar.ray_cast', 'x': -0.5, 'y': 0.0, 'z': 1.60, 'yaw': 0.0, 'pitch': 0.0, 'roll': 0.0,
                       'range': 30, 
-                      'rotation_frequency': 20, 'channels': 128,
+                      'rotation_frequency': 20, 'channels': 64,
                       'upper_fov': 4, 'lower_fov': -25, 'points_per_second': 2304000,
                       'id': 'Back-LIDAR'},
 
-
+            # camera sensors
             {'type': 'sensor.camera.rgb', 'x': 0.7, 'y': -0.4, 'z': 1.60, 'roll': 0.0, 'pitch': 0.0, 'yaw': -45.0,
                       'width': 1280, 'height': 720, 'fov': 100, 'id': 'Left'},
 
@@ -131,32 +132,42 @@ class Detector:
             for key in self._lidar_keys:
                 det_bboxes = []
                 _, lidar_data = sensor_data[key]
-                # convert to KITTI coordinates
-                # lidar_data[:,:3] = (self._carla_to_kitti @ lidar_data[:,:3].T).T
                 result, _ = inference_detector(self._point_pillar, lidar_data)
                 bboxes3d = result.pred_instances_3d.bboxes_3d.corners.detach().cpu().numpy()
                 n_detections = bboxes3d.shape[0]
                 if n_detections == 0:
                     continue
+                det_scores = result.pred_instances_3d.scores_3d.detach().cpu().numpy().flatten()
+                det_classes = result.pred_instances_3d.labels_3d.detach().cpu().numpy().flatten()
+                valid_indices = np.where(det_scores > 0.2)
 
-                for i in range(n_detections):
+                det_scores = det_scores[valid_indices]
+                if det_scores.shape[0] == 0:
+                    continue
+                det_classes = det_classes[valid_indices]
+                bboxes3d = bboxes3d[valid_indices]
+
+                for i in range(bboxes3d.shape[0]):
                     bbox3d = bboxes3d[i]
-                    # det_boxes = np.array([[[0,0,0],[0,1,0],[1,1,0],[1,0,0],[0,0,1],[0,1,1],[1,1,1],[1,0,1]]])
+                    # det_score = det_scores[i]
+                    # if det_score < 0.1:
+                    #     continue
                     bbox3d = np.stack([
                         bbox3d[1], bbox3d[2], bbox3d[6], bbox3d[5], bbox3d[0], bbox3d[3], bbox3d[7], bbox3d[4] 
                     ])
                     bbox3d = np.concatenate([bbox3d, np.ones((8, 1))], axis=1) # 8 x 4
                     bbox3d = (sensor_transforms[f"{key}2world"] @ bbox3d.T).T # 8 x 4 
                     bbox3d = bbox3d[:, :3] / bbox3d[:, -1][:, np.newaxis] # 8 x 3
-                    # convert back to carla coordinates
-                    # bbox3d = (np.linalg.inv(self._carla_to_kitti) @ bbox3d.T).T
                     det_bboxes.append(bbox3d) 
                 det_bboxes = np.stack(det_bboxes)
-                det_classes = result.pred_instances_3d.labels_3d.detach().cpu().numpy().flatten()
-                det_scores = result.pred_instances_3d.scores_3d.detach().cpu().numpy().flatten()
                 final_det_bboxes.append(det_bboxes)
                 final_det_classes.append(det_classes)
                 final_det_labels.append(det_scores)
+                # return {
+                #     "det_boxes": det_bboxes,
+                #     "det_class": det_classes,
+                #     "det_score": det_scores 
+                # }
 
             if len(final_det_bboxes) == 0:
                 return {}

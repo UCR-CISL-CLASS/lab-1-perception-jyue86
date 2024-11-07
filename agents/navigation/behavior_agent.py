@@ -397,11 +397,11 @@ class BehaviorAgent(BasicAgent):
         if "det_boxes" in detections and gt_detections["det_boxes"].shape[0] > 0:
             # if self._count == 0 and gt_detections["det_boxes"].shape[0] > 0:
             print("====================================")
-            # print("Frame number:", frame_number)
-            # print("GT detections:\n", gt_detections["det_boxes"])
-            # print("Detections:\n", det_boxes)
-            # print("gt box shape:", gt_detections["det_boxes"].shape)
-            # print("det box shape:", det_boxes.shape)
+            print("Frame number:", frame_number)
+            print("GT detections:\n", gt_detections["det_boxes"])
+            print("Detections:\n", det_boxes)
+            print("gt box shape:", gt_detections["det_boxes"].shape)
+            print("det box shape:", det_boxes.shape)
             max_iou = float("-inf") 
 
             for gt_box in gt_detections["det_boxes"]:
@@ -436,10 +436,10 @@ class BehaviorAgent(BasicAgent):
 
                     try:
                         iou = intersection / union
-                        if iou != 0.0:
-                            print("Frame number:", frame_number)
-                            print("GT detections:\n", gt_box)
-                            print("Detections:\n", det_box)
+                        # if iou != 0.0:
+                        #     print("Frame number:", frame_number)
+                        #     print("GT detections:\n", gt_box)
+                        #     print("Detections:\n", det_box)
 
                         max_iou = max(iou, max_iou)
                         # print(f"IoU between GT box and detection box: {iou}")
