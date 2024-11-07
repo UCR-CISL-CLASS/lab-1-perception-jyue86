@@ -8,6 +8,8 @@ Please refer to the instructions [here](https://docs.google.com/document/d/1BvQ9
 Clone this repo into a project directory, i.e., this repo will be a sub-directory of the project repository. All commands
 will be ran from the project directory instead.
 
+Create a conda environment by running  `conda env create -f lab-1-perception-jyue86/environment.yml`.
+
 Make sure to give the CARLA simulator access to the display by running `xhost +`.
 
 Then, you can run the following docker command to run the CARLA simulator. This command will automatically pull the container if it's not already found.
